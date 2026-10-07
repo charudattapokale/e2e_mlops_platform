@@ -8,7 +8,12 @@ terraform {
       source  = "hashicorp/kubernetes"
       version = ">= 2.30, < 4.0"
     }
-    # Generates random values, used here for the database password
+    # Installs Helm charts (pinned to 2.x, the syntax differs in 3.x)
+    helm = {
+      source  = "hashicorp/helm"
+      version = "~> 2.17"
+    }
+    # Generates random values, used for the database password
     random = {
       source  = "hashicorp/random"
       version = ">= 3.6"
@@ -20,6 +25,14 @@ terraform {
 provider "kubernetes" {
   config_path    = "~/.kube/config"
   config_context = "k3d-mlops"
+}
+
+# The Helm plugin uses the same cluster connection
+provider "helm" {
+  kubernetes {
+    config_path    = "~/.kube/config"
+    config_context = "k3d-mlops"
+  }
 }
 
 # One namespace for each name in var.namespaces (see variables.tf)
