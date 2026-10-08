@@ -49,7 +49,7 @@ resource "helm_release" "jenkins" {
                         scm {
                           git {
                             remote { url('https://github.com/charudattapokale/e2e_mlops_platform.git') }
-                            branch('*/feat/training-pipeline')
+                            branch('*/main')
                           }
                         }
                         scriptPath('jenkins/training.Jenkinsfile')
