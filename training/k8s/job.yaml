@@ -1,0 +1,31 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: training-${BUILD_NUMBER}
+  namespace: training
+  labels:
+    app: training
+spec:
+  backoffLimit: 0                  # do not retry a failed training run
+  ttlSecondsAfterFinished: 600     # remove the pod 10 minutes after it ends
+  template:
+    metadata:
+      labels:
+        app: training
+    spec:
+      restartPolicy: Never
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+      containers:
+        - name: train
+          image: ${IMAGE}
+          env:
+            - {name: MLFLOW_TRACKING_URI, value: "http://mlflow.mlops.svc.cluster.local"}
+            - {name: MLFLOW_EXPERIMENT,   value: "${MLFLOW_EXPERIMENT}"}
+            - {name: LEARNING_RATE,       value: "${LEARNING_RATE}"}
+            - {name: MAX_ITER,            value: "${MAX_ITER}"}
+            - {name: MAX_DEPTH,           value: "${MAX_DEPTH}"}
+          resources:
+            requests: {cpu: 500m, memory: 1Gi}
+            limits: {memory: 2Gi}
