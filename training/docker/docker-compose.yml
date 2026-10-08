@@ -1,0 +1,14 @@
+# Local testing only. The pipeline builds the Dockerfile with Kaniko and runs training/k8s/job.yaml.
+services:
+  train:
+    build:
+      context: ..                      # the training/ folder
+      dockerfile: docker/Dockerfile
+      target: runtime
+    image: localhost:5001/training:dev
+    network_mode: host                 # reach the MLflow port-forward on localhost:5000
+    environment:
+      MLFLOW_TRACKING_URI: http://localhost:5000
+      LEARNING_RATE: "0.1"
+      MAX_ITER: "200"
+      MAX_DEPTH: "6"
