@@ -42,8 +42,12 @@ pipeline {
             env.TAG = sh(returnStdout: true, script:
               "git ls-files training | grep -v -E '^training/(k8s|docker/docker-compose.yml)' | xargs sha256sum | sha256sum | cut -c1-12").trim()
             sh "curl -s http://${env.REGISTRY}/v2/training/tags/list || true"
+            def regIp = sh(returnStdout: true, script: "getent hosts mlops-registry.localhost | cut -d' ' -f1").trim()
+            sh "curl -s --resolve mlops-registry.localhost:5000:${regIp} http://${env.REGISTRY}/v2/training/tags/list || true"
+            def regIp = sh(returnStdout: true, script: "getent hosts mlops-registry.localhost | cut -d' ' -f1").trim()
+            sh "curl -s --resolve mlops-registry.localhost:5000:${regIp} http://${env.REGISTRY}/v2/training/tags/list || true"
             def rc = sh(returnStatus: true, script:
-              "curl -sf http://${env.REGISTRY}/v2/training/tags/list | grep -q '\"${env.TAG}\"'")
+              "curl -sf --resolve mlops-registry.localhost:5000:${regIp} http://${env.REGISTRY}/v2/training/tags/list | grep -q '\"${env.TAG}\"'")
             env.IMAGE_EXISTS = (rc == 0) ? 'true' : 'false'
             echo "Image tag ${env.TAG}, already in registry: ${env.IMAGE_EXISTS}"
           }
