@@ -4,7 +4,7 @@ Two Terraform stages build the whole local platform:
 
 | Stage | Folder | Creates |
 | --- | --- | --- |
-| 1. cluster | `cluster/` | The k3d cluster `mlops` and the local image registry (`k3d-mlops-registry.localhost:5001`) |
+| 1. cluster | `cluster/` | The k3d cluster `mlops` and the local image registry (`localhost:5001` from your laptop, `mlops-registry.localhost:5000` inside the cluster) |
 | 2. platform | `platform/` | Namespaces, Postgres, the MLflow artifact volume and MLflow (later Jenkins, monitoring) |
 
 The stages are separate because the Kubernetes and Helm providers need a running cluster before they can plan anything. On EKS, `cluster/` becomes an EKS module and `platform/` stays almost the same.
@@ -139,3 +139,4 @@ Earlier attempts were OOMKilled: 4 workers with a 768Mi limit, and 1 worker with
 - **Pod OOMKilled:** check the limit with `kubectl get deploy mlflow -n mlops -o jsonpath='{.spec.template.spec.containers[0].resources}'` and raise it in `mlflow.tf`. Changing it only with `kubectl` is reverted by the next apply.
 - **`down.sh` hangs or fails:** finish by hand with `k3d cluster delete mlops`, then delete `cluster/terraform.tfstate*` and `platform/terraform.tfstate*` before the next `up.sh`.
 - **Cluster stage does not notice a deleted cluster:** it uses `null_resource` with `k3d`, so Terraform only knows what it ran. If you delete the cluster outside Terraform, run `terraform -chdir=cluster destroy` (or remove the cluster state file) before `up.sh`.
+- **Registry addresses:** push from your laptop to `localhost:5001/<image>:<tag>`. Pods in the cluster (Jenkins agents, Jobs) pull and push as `mlops-registry.localhost:5000/<image>:<tag>`. Test: push busybox to `localhost:5001`, then run a pod with the `:5000` address.
