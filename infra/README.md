@@ -140,3 +140,14 @@ Earlier attempts were OOMKilled: 4 workers with a 768Mi limit, and 1 worker with
 - **`down.sh` hangs or fails:** finish by hand with `k3d cluster delete mlops`, then delete `cluster/terraform.tfstate*` and `platform/terraform.tfstate*` before the next `up.sh`.
 - **Cluster stage does not notice a deleted cluster:** it uses `null_resource` with `k3d`, so Terraform only knows what it ran. If you delete the cluster outside Terraform, run `terraform -chdir=cluster destroy` (or remove the cluster state file) before `up.sh`.
 - **Registry addresses:** push from your laptop to `localhost:5001/<image>:<tag>`. Pods in the cluster (Jenkins agents, Jobs) pull and push as `mlops-registry.localhost:5000/<image>:<tag>`. Test: push busybox to `localhost:5001`, then run a pod with the `:5000` address.
+
+## Jenkins
+
+Jenkins runs in the `ci` namespace (official Helm chart, `platform/jenkins.tf`) with a 5Gi volume for its home directory. It uses about 800Mi of memory.
+
+```bash
+kubectl port-forward -n ci svc/jenkins 8080:8080
+kubectl get secret -n ci jenkins -o jsonpath='{.data.jenkins-admin-password}' | base64 -d; echo
+```
+
+Open http://localhost:8080 and log in as `admin` with that password.
