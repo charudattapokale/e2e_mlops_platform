@@ -1,0 +1,11 @@
+apiVersion: k3d.io/v1alpha5
+kind: Simple
+metadata:
+  name: mlops
+servers: 1
+agents: 0
+registries:
+  create:
+    name: mlops-registry.localhost
+    host: "0.0.0.0"
+    hostPort: "5001"
