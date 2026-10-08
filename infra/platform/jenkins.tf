@@ -30,6 +30,8 @@ resource "helm_release" "jenkins" {
         "git:latest",
         "configuration-as-code:latest",
         "job-dsl:latest",
+        "pipeline-stage-view:latest",
+        "pipeline-graph-view:latest",
       ]
 
       # Agent pods run in the ci namespace with the jenkins-agent service account
