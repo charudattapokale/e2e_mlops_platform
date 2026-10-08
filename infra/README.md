@@ -1,14 +1,30 @@
 # infra: Terraform for the local platform
 
-Creates the platform pieces inside the local k3d cluster. The cluster itself is created by hand once (see `../bootstrap.md`, step 14).
+Two Terraform stages build the whole local platform:
+
+| Stage | Folder | Creates |
+| --- | --- | --- |
+| 1. cluster | `cluster/` | The k3d cluster `mlops` and the local image registry (`k3d-mlops-registry.localhost:5001`) |
+| 2. platform | `platform/` | Namespaces, Postgres, the MLflow artifact volume and MLflow (later Jenkins, monitoring) |
+
+The stages are separate because the Kubernetes and Helm providers need a running cluster before they can plan anything. On EKS, `cluster/` becomes an EKS module and `platform/` stays almost the same.
+
+## Quick start
+
+```bash
+../scripts/up.sh      # build everything: cluster, registry, Postgres, MLflow
+../scripts/down.sh    # destroy everything (this deletes the data in both volumes)
+```
 
 ## Prerequisites
 
 - WSL2 Ubuntu with Docker, kubectl, helm, terraform and k3d installed (see `../bootstrap.md`)
-- The cluster `mlops` is running, with kubectl context `k3d-mlops`
+- Docker is running
+
+After `up.sh` the cluster should be healthy:
 
 ```bash
-k3d cluster list                  # the cluster named mlops should be listed
+k3d cluster list                  # mlops should be listed, 1/1 servers
 kubectl config current-context    # should print k3d-mlops
 kubectl get nodes                 # one node in Ready state
 ```
@@ -17,53 +33,57 @@ kubectl get nodes                 # one node in Ready state
 
 | File | Purpose |
 | --- | --- |
-| `main.tf` | Terraform settings, the Kubernetes provider connection, and the namespaces |
-| `variables.tf` | Inputs, for example the list of namespaces |
-| `.terraform.lock.hcl` | Pins provider versions (created by `init`, commit it) |
-| `terraform.tfstate`, `.terraform/` | Terraform's state and downloaded plugins (never commit) |
+| `cluster/k3d-config.yaml` | k3d cluster and registry definition |
+| `cluster/main.tf` | Runs `k3d cluster create` and `k3d cluster delete` through a `null_resource` |
+| `platform/main.tf` | Terraform settings, provider connections (context `k3d-mlops`), namespaces |
+| `platform/variables.tf` | Inputs, for example the list of namespaces |
+| `platform/postgres.tf` | Postgres password, Secret, Service and StatefulSet |
+| `platform/mlflow.tf` | Artifact volume and the MLflow Helm release |
+| `*/.terraform.lock.hcl` | Pins provider versions (created by `init`, commit it) |
+| `*/terraform.tfstate`, `*/.terraform/` | State and plugins (never commit) |
 
-## Commands
+## Commands for one stage
 
-Run these inside the `infra` folder.
+Run these inside `cluster/` or `platform/`, or use `terraform -chdir=platform <command>` from `infra/`.
 
 ```bash
-terraform init       # download the Kubernetes provider, creates .terraform.lock.hcl
+terraform init       # download providers, creates .terraform.lock.hcl
 terraform fmt        # format the .tf files
-terraform validate   # check the syntax and settings, changes nothing
-terraform plan       # show what would be created, changes nothing
-terraform apply      # create it for real, type yes to confirm
+terraform validate   # check the syntax, changes nothing
+terraform plan       # show what would change, changes nothing
+terraform apply      # change it for real, type yes to confirm
 ```
 
 ## Check the result
 
 ```bash
-kubectl get ns       # ci, mlops, training, serving, monitoring should be listed
-terraform plan       # should say: No changes. Your infrastructure matches the configuration.
+kubectl get ns                    # ci, mlops, training, serving, monitoring are listed
+kubectl get pods -n mlops         # postgres-0 and mlflow-... are 1/1 Running
+terraform -chdir=platform plan    # should say: No changes.
 ```
 
 ## Rebuild from code
 
 ```bash
-terraform destroy    # remove everything Terraform created, type yes
-kubectl get ns       # the five namespaces are gone
-terraform apply      # create them again, type yes
+../scripts/down.sh    # platform destroy, then cluster destroy
+../scripts/up.sh      # cluster apply, then platform apply
 ```
 
 ## Change the namespaces
 
-Edit the `namespaces` default in `variables.tf`, then run:
+Edit the `namespaces` default in `platform/variables.tf`, then run:
 
 ```bash
-terraform plan
-terraform apply
+terraform -chdir=platform plan
+terraform -chdir=platform apply
 ```
 
 ## Notes
 
 - Never commit the state file or the `.terraform/` folder (they are in `.gitignore`).
 - Commit `.terraform.lock.hcl`.
-- If `plan` says the context does not exist, check the name with `kubectl config get-contexts` and fix `config_context` in `main.tf`.
-- Next steps: local image registry, Jenkins, training job.
+- If `plan` says the context does not exist, check the name with `kubectl config get-contexts` and fix `config_context` in `platform/main.tf`.
+- Next steps: Jenkins, training job.
 
 ## Storage
 
@@ -117,3 +137,5 @@ Earlier attempts were OOMKilled: 4 workers with a 768Mi limit, and 1 worker with
 - **State lock error:** a `terraform apply` is still running. Check `pgrep -a terraform` and stop it with `kill -INT <pid>`. Use `terraform force-unlock <id>` only when no Terraform process is running.
 - **"cannot re-use a name that is still in use":** an interrupted apply left a Helm release that Terraform no longer tracks. Run `helm uninstall mlflow -n mlops`, then apply again.
 - **Pod OOMKilled:** check the limit with `kubectl get deploy mlflow -n mlops -o jsonpath='{.spec.template.spec.containers[0].resources}'` and raise it in `mlflow.tf`. Changing it only with `kubectl` is reverted by the next apply.
+- **`down.sh` hangs or fails:** finish by hand with `k3d cluster delete mlops`, then delete `cluster/terraform.tfstate*` and `platform/terraform.tfstate*` before the next `up.sh`.
+- **Cluster stage does not notice a deleted cluster:** it uses `null_resource` with `k3d`, so Terraform only knows what it ran. If you delete the cluster outside Terraform, run `terraform -chdir=cluster destroy` (or remove the cluster state file) before `up.sh`.
