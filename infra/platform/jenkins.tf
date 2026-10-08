@@ -1,5 +1,5 @@
 # Jenkins controller in the ci namespace (official chart).
-# Builds will run in temporary agent pods, so the controller stays small.
+# Builds run in temporary agent pods, so the controller stays small.
 resource "helm_release" "jenkins" {
   name       = "jenkins"
   namespace  = kubernetes_namespace_v1.ns["ci"].metadata[0].name
@@ -20,6 +20,42 @@ resource "helm_release" "jenkins" {
         }
         limits = {
           memory = "2Gi"
+        }
+      }
+
+      # Replaces the chart's default plugin list, so the defaults are repeated here
+      installPlugins = [
+        "kubernetes:latest",
+        "workflow-aggregator:latest",
+        "git:latest",
+        "configuration-as-code:latest",
+        "job-dsl:latest",
+      ]
+
+      # Agent pods run in the ci namespace with the jenkins-agent service account
+      # (rbac.tf), so they may create Jobs in the training namespace.
+      JCasC = {
+        defaultConfig = true
+        configScripts = {
+          training-job = <<-EOT
+            jobs:
+              - script: >
+                  pipelineJob('training_jenkins_pipeline') {
+                    description('Train the bank marketing model and log it to MLflow')
+                    definition {
+                      cpsScm {
+                        scm {
+                          git {
+                            remote { url('https://github.com/charudattapokale/e2e_mlops_platform.git') }
+                            branch('*/feat/training-pipeline')
+                          }
+                        }
+                        scriptPath('jenkins/training.Jenkinsfile')
+                        lightweight(true)
+                      }
+                    }
+                  }
+          EOT
         }
       }
     }
