@@ -41,8 +41,9 @@ pipeline {
           script {
             env.TAG = sh(returnStdout: true, script:
               "git ls-files training | grep -v -E '^training/(k8s|docker/docker-compose.yml)' | xargs sha256sum | sha256sum | cut -c1-12").trim()
+            sh "curl -s http://${env.REGISTRY}/v2/training/tags/list || true"
             def rc = sh(returnStatus: true, script:
-              "curl -sf -o /dev/null -H 'Accept: application/vnd.oci.image.manifest.v1+json, application/vnd.docker.distribution.manifest.v2+json' http://${env.REGISTRY}/v2/training/manifests/${env.TAG}")
+              "curl -sf http://${env.REGISTRY}/v2/training/tags/list | grep -q '\"${env.TAG}\"'")
             env.IMAGE_EXISTS = (rc == 0) ? 'true' : 'false'
             echo "Image tag ${env.TAG}, already in registry: ${env.IMAGE_EXISTS}"
           }
