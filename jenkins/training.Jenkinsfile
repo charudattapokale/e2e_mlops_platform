@@ -11,9 +11,9 @@ pipeline {
     timeout(time: 30, unit: 'MINUTES')
   }
 
-  triggers {
-    cron('H/10 * * * *')
-  }
+  // triggers {
+  //   cron('H/10 * * * *')
+  // }
 
   parameters {
     string(name: 'GIT_BRANCH',        defaultValue: 'main',           description: 'Branch to build')
