@@ -49,3 +49,5 @@ kubectl port-forward -n ci svc/jenkins 8080:8080     # http://localhost:8080
 
 Done: cluster, registry, Postgres, MLflow, Jenkins.
 Next: training pipeline (build, push, run as a Job), then model registry promotion, serving, monitoring.
+
+See [docs/commands.md](docs/commands.md) for the everyday commands.
