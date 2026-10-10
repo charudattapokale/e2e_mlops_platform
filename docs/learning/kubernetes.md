@@ -72,3 +72,14 @@ Not-healthy pods only: `kubectl get pods -A | grep -v -E 'Running|Completed'`.
 
 ## Data
 `k3d cluster stop/start` keeps volumes. `k3d cluster delete` (and `down.sh`) removes them.
+
+## Nodes
+
+- A **cluster** is a group of machines that run your apps together.
+- Each machine is a **node**: it has CPU and RAM. It can be a server, a VM, or (in k3d) a Docker container.
+- **Control plane** node = the manager. It decides what runs where and remembers what you asked for.
+- **Worker** node = does the work. It runs your containers.
+- Kubernetes runs on every node. Only the manager parts sit on the control plane.
+- Our cluster has one node that is both: `k3d-mlops-server-0`.
+
+Check: `kubectl get nodes -o wide`
