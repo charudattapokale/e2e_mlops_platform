@@ -42,3 +42,31 @@ Not-healthy pods only: `kubectl get pods -A | grep -v -E 'Running|Completed'`.
 
 ## Data
 `k3d cluster stop/start` keeps volumes. `k3d cluster delete` (and `down.sh`) removes them.
+
+## Hierarchy
+
+    cluster
+    ├── nodes                      machines that run pods (cluster-wide, not in a namespace)
+    └── namespaces                 logical partitions (ci, mlops, training, serving, monitoring)
+        └── workloads              Deployment, StatefulSet, Job, CronJob (the controllers)
+            └── pods               the smallest thing Kubernetes schedules
+                └── containers     the actual processes (images)
+
+| Level | What it is | In this project |
+| --- | --- | --- |
+| Cluster | The whole Kubernetes system: control plane plus nodes | k3d cluster `mlops` |
+| Node | A machine (VM or server) that runs pods | `k3d-mlops-server-0`, which is itself a Docker container |
+| Namespace | A logical partition for names, access rules and quotas. It does not separate machines | `ci`, `mlops`, `training`, `serving`, `monitoring` |
+| Workload | A controller that creates and manages pods | `postgres` StatefulSet, `mlflow` Deployment, `training-<n>` Job |
+| Pod | One or more containers sharing network and volumes, scheduled together on one node | `postgres-0`, `jenkins-0`, a Jenkins agent pod |
+| Container | A running image | `train`, `kaniko`, `kubectl`, `jenkins` |
+
+Nuances:
+- Namespaces and nodes are separate dimensions. A pod has a namespace (where it is defined) and a node (where it runs). Namespaces do not map to machines.
+- Some objects are cluster-scoped, not namespaced: nodes, namespaces, PersistentVolumes, ClusterRoles. Pods, Deployments, Services, Roles and PVCs are namespaced.
+- Workload controllers own pods. A Deployment owns a ReplicaSet, which owns the pods, so deleting a pod makes the controller create a new one. A Job owns a pod and stops when it succeeds.
+- A pod can hold several containers. `jenkins-0` shows `2/2`: the `jenkins` container plus a `config-reload` sidecar. The agent pod has `jnlp`, `kaniko` and `kubectl`. The containers share the pod's network (`localhost`) and its volumes, which is why `kubectl` sees the files `git` checked out.
+- Init containers run first and must finish before the main containers start (the MLflow pod waits on `dbchecker` and `mlflow-db-migration`).
+- Services, Ingresses, ConfigMaps and Secrets are not workloads. They do not run anything. A Service gives pods a stable name and address, and an Ingress routes outside traffic to a Service.
+- Resource limits apply per container. The scheduler sums the requests of all containers in a pod to pick a node.
+- A single-node cluster still has this structure: one node, many namespaces, many pods.

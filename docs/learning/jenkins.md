@@ -44,3 +44,34 @@ No change to `jenkins.tf`: `fileset` picks up new files.
 - `>` in YAML folds lines together, `|` keeps newlines. Use `|` for scripts.
 - The `config-reload` sidecar applies a changed ConfigMap without restarting the pod.
 - Agent pods share one workspace volume across containers, so `kubectl` sees the files `git` checked out.
+
+## How the files connect
+
+    jenkins/jobs/training.groovy      (Job DSL: what exists)
+      - job name, the parameter form (UI)
+      - scriptPath -> jenkins/training.Jenkinsfile
+            |
+            v
+    jenkins/training.Jenkinsfile      (pipeline: what runs, every build)
+      - stages: checkout, check image, Kaniko build, run job, wait and logs, cleanup
+      - Run stage: envsubst < training/k8s/job.yaml | kubectl apply -f -
+            |
+            v
+    training/k8s/job.yaml             (Kubernetes manifest: the workload)
+      - one Job in namespace training, runs the image, then finishes
+
+| File | Holds | Changes with |
+| --- | --- | --- |
+| `jenkins/jobs/*.groovy` | Job name, parameter form, repo, branch and path of the Jenkinsfile | `terraform apply` |
+| `jenkins/*.Jenkinsfile` | The stage logic. Calls the Kubernetes manifest through `kubectl` | `git push` |
+| `training/k8s/job.yaml` | The Job template with `${...}` placeholders | `git push` |
+
+The training manifest contains only a Job. There is no Deployment, Service or Ingress, because nothing connects to a training pod and it is not a server.
+Deployment, Service and Ingress belong to serving: `inference/k8s/app.yaml`, applied by a serving pipeline.
+
+Flow of one build:
+1. Terraform and Job DSL created the job with its form (earlier, once per apply).
+2. You click Build with Parameters. Jenkins fetches the Jenkinsfile named by `scriptPath`.
+3. The Jenkinsfile starts an agent pod, builds or reuses the image, fills `job.yaml` with `envsubst`, applies it.
+4. Kubernetes creates the Job and its pod in `training`. The pod runs `train.py`, logs to MLflow, exits.
+5. The pipeline waits, prints the logs, deletes the Job.
