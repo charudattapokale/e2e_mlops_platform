@@ -1,0 +1,64 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: inference
+  namespace: serving
+  labels: {app: inference}
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: inference}
+  template:
+    metadata:
+      labels: {app: inference}
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+      containers:
+        - name: inference
+          image: ${IMAGE}
+          ports:
+            - containerPort: 8000
+          env:
+            - {name: MLFLOW_TRACKING_URI, value: "http://mlflow.mlops.svc.cluster.local"}
+            - {name: MODEL_NAME, value: "bank-marketing"}
+            - {name: MODEL_ALIAS, value: "champion"}
+          readinessProbe:
+            httpGet: {path: /health, port: 8000}
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: {path: /health, port: 8000}
+            initialDelaySeconds: 30
+            periodSeconds: 20
+          resources:
+            requests: {cpu: 100m, memory: 256Mi}
+            limits: {memory: 1Gi}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: inference
+  namespace: serving
+spec:
+  selector: {app: inference}
+  ports:
+    - port: 80
+      targetPort: 8000
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: inference
+  namespace: serving
+spec:
+  ingressClassName: traefik
+  rules:
+    - host: api.localhost
+      http:
+        paths:
+          - {path: /predict,      pathType: Prefix, backend: {service: {name: inference, port: {number: 80}}}}
+          - {path: /health,       pathType: Prefix, backend: {service: {name: inference, port: {number: 80}}}}
+          - {path: /docs,         pathType: Prefix, backend: {service: {name: inference, port: {number: 80}}}}
+          - {path: /openapi.json, pathType: Prefix, backend: {service: {name: inference, port: {number: 80}}}}
