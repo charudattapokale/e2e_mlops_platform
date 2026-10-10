@@ -2,3 +2,8 @@
 __pycache__
 docker
 k8s
+dataset/data
+*.csv
+*.parquet
+*.arff
+*.zip
