@@ -9,3 +9,7 @@ registries:
     name: mlops-registry.localhost
     host: "0.0.0.0"
     hostPort: "5001"
+ports:
+  - port: 8081:80
+    nodeFilters:
+      - loadbalancer
