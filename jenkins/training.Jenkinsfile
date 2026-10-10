@@ -15,14 +15,6 @@ pipeline {
   //   cron('H/10 * * * *')
   // }
 
-  parameters {
-    string(name: 'GIT_BRANCH',        defaultValue: 'main',           description: 'Branch to build')
-    string(name: 'LEARNING_RATE',     defaultValue: '0.1',            description: 'Learning rate')
-    string(name: 'MAX_ITER',          defaultValue: '200',            description: 'Boosting iterations')
-    string(name: 'MAX_DEPTH',         defaultValue: '6',              description: 'Max tree depth')
-    string(name: 'MLFLOW_EXPERIMENT', defaultValue: 'bank-marketing', description: 'MLflow experiment name')
-  }
-
   environment {
     REGISTRY = 'mlops-registry.localhost:5000'
   }
