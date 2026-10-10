@@ -1,18 +1,14 @@
 import logging
-import os
 from contextlib import asynccontextmanager
 
-import mlflow
-import mlflow.sklearn
 import pandas as pd
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
-log = logging.getLogger("inference")
+from app.model_store import load_champion, state
+from app.webhook import router as webhook_router
 
-TRACKING_URI = os.getenv("MLFLOW_TRACKING_URI", "http://localhost:5000")
-MODEL_NAME = os.getenv("MODEL_NAME", "bank-marketing")
-MODEL_ALIAS = os.getenv("MODEL_ALIAS", "champion")
+log = logging.getLogger("inference")
 
 # Readable request field -> column name the model was trained with
 COLUMNS = {
@@ -21,8 +17,6 @@ COLUMNS = {
     "contact": "V9", "day": "V10", "month": "V11", "duration": "V12",
     "campaign": "V13", "pdays": "V14", "previous": "V15", "poutcome": "V16",
 }
-
-state = {"model": None, "version": None}
 
 
 class Client(BaseModel):
@@ -44,16 +38,6 @@ class Client(BaseModel):
     poutcome: str
 
 
-def load_champion():
-    """Load the model behind the champion alias from the MLflow registry."""
-    mlflow.set_tracking_uri(TRACKING_URI)
-    uri = f"models:/{MODEL_NAME}@{MODEL_ALIAS}"
-    state["model"] = mlflow.sklearn.load_model(uri)
-    version = mlflow.MlflowClient().get_model_version_by_alias(MODEL_NAME, MODEL_ALIAS)
-    state["version"] = version.version
-    log.info("Loaded %s version %s", uri, state["version"])
-
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     try:
@@ -64,6 +48,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Bank marketing inference", lifespan=lifespan)
+app.include_router(webhook_router)
 
 
 @app.get("/health")
