@@ -36,7 +36,7 @@ pipeline {
               REG_IP=$(getent hosts mlops-registry.localhost | cut -d' ' -f1)
               curl -sf --resolve mlops-registry.localhost:5000:$REG_IP http://$REGISTRY/v2/$APP/tags/list | grep -qF "\\"$TAG\\""
             ''') == 0
-            env.BUILD_IMAGE = (!exists || params.FORCE_BUILD) ? 'true' : 'false'
+            env.BUILD_IMAGE = exists ? 'false' : 'true'
             echo "Image tag ${env.TAG}, already in registry: ${exists}"
           }
         }

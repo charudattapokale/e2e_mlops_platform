@@ -2,7 +2,6 @@ pipelineJob('inference_jenkins_pipeline') {
   description('Build the inference image (skipped when unchanged), deploy it to the serving namespace and register the MLflow webhook')
   parameters {
     stringParam('GIT_BRANCH', 'main', 'Branch to build')
-    booleanParam('FORCE_BUILD', false, 'Rebuild the image even if this content was built before')
   }
   definition {
     cpsScm {
