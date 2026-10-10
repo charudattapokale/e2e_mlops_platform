@@ -70,6 +70,13 @@ resource "helm_release" "mlflow" {
     # mlflow.mlops.svc.cluster.local. Fine locally, tighten it for real deployments
     serverAllowedHosts = ["*"]
 
+    # Webhook delivery to the in-cluster inference service. MLflow's SSRF guard blocks
+    # http and private addresses by default. Local-only setting, see docs/learning/mlflow.md
+    extraEnvVars = {
+      MLFLOW_WEBHOOK_ALLOWED_SCHEMES   = "http,https"
+      MLFLOW_WEBHOOK_ALLOW_PRIVATE_IPS = "true"
+    }
+
     # Mount the persistent disk into the MLflow pod
     extraVolumes = [{
       name = "artifacts"
