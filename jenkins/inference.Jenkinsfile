@@ -68,6 +68,8 @@ pipeline {
             envsubst '${IMAGE}' < inference/k8s/app.yaml > /tmp/app.yaml
             kubectl apply --dry-run=server -f /tmp/app.yaml
             kubectl apply -f /tmp/app.yaml
+            kubectl annotate deployment/$APP -n $NS kubernetes.io/change-cause="jenkins build $BUILD_NUMBER, image tag $TAG" --overwrite
+            kubectl rollout restart deployment/$APP -n $NS
             kubectl rollout status deployment/$APP -n $NS --timeout=240s
           '''
         }
