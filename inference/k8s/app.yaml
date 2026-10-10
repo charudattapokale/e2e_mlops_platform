@@ -24,6 +24,15 @@ spec:
             - {name: MLFLOW_TRACKING_URI, value: "http://mlflow.mlops.svc.cluster.local"}
             - {name: MODEL_NAME, value: "bank-marketing"}
             - {name: MODEL_ALIAS, value: "champion"}
+            - {name: MLFLOW_HTTP_REQUEST_MAX_RETRIES, value: "2"}
+            - {name: MLFLOW_HTTP_REQUEST_BACKOFF_FACTOR, value: "1"}
+            - {name: MLFLOW_HTTP_REQUEST_TIMEOUT, value: "10"}
+            - {name: STARTUP_LOAD_ATTEMPTS, value: "5"}
+            - {name: STARTUP_RETRY_SECONDS, value: "3"}
+          startupProbe:
+            httpGet: {path: /health, port: 8000}
+            periodSeconds: 5
+            failureThreshold: 30
           readinessProbe:
             httpGet: {path: /health, port: 8000}
             initialDelaySeconds: 5

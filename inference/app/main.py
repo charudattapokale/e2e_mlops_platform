@@ -1,14 +1,18 @@
 import logging
+import time
 from contextlib import asynccontextmanager
 
 import pandas as pd
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
-from app.model_store import load_champion, state
+from app.logging_config import setup_logging
+from app.model_store import ChampionNotFound, load_champion, load_champion_or_fail, state
 from app.webhook import router as webhook_router
 
-log = logging.getLogger("inference")
+setup_logging()
+log = logging.getLogger("inference.app")
+predict_log = logging.getLogger("inference.predict")
 
 # Readable request field -> column name the model was trained with
 COLUMNS = {
@@ -41,9 +45,13 @@ class Client(BaseModel):
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     try:
-        load_champion()
-    except Exception:
-        log.exception("Could not load the champion model, starting without it")
+        load_champion_or_fail()
+    except ChampionNotFound as exc:
+        log.error("event=startup_aborted reason=no_champion detail=%s", exc)
+        raise RuntimeError("no champion model, refusing to start") from exc
+    except Exception as exc:
+        log.error("event=startup_aborted reason=load_failed detail=%s", exc)
+        raise RuntimeError("could not load the champion model, refusing to start") from exc
     yield
 
 
@@ -56,24 +64,35 @@ def health():
     return {"status": "ok", "model_loaded": state["model"] is not None}
 
 
-@app.post("/reload")
+@app.post("/reload", include_in_schema=False)
 def reload_model():
     try:
         load_champion()
+    except ChampionNotFound as exc:
+        log.warning("event=reload_failed reason=no_champion detail=%s", exc)
+        raise HTTPException(status_code=503, detail="no champion model to load")
     except Exception as exc:
+        log.exception("event=reload_failed")
         raise HTTPException(status_code=503, detail=f"reload failed: {exc}")
     return {"model_version": state["version"]}
 
 
 @app.post("/predict")
 def predict(client: Client):
-    if state["model"] is None:
+    # Read both once, so a reload in another thread cannot mix a model with the wrong version
+    model, version = state["model"], state["version"]
+    if model is None:
+        predict_log.warning("event=predict_rejected reason=no_model")
         raise HTTPException(status_code=503, detail="model not loaded")
+
+    started = time.perf_counter()
     row = {COLUMNS[k]: v for k, v in client.model_dump().items()}
-    frame = pd.DataFrame([row])
-    proba = float(state["model"].predict_proba(frame)[0, 1])
-    return {
-        "prediction": int(proba > 0.5),
-        "probability": proba,
-        "model_version": state["version"],
-    }
+    proba = float(model.predict_proba(pd.DataFrame([row]))[0, 1])
+    prediction = int(proba > 0.5)
+
+    # Inputs are personal banking data and are never logged
+    predict_log.info(
+        "event=predict model_version=%s prediction=%d probability=%.4f latency_ms=%.1f",
+        version, prediction, proba, (time.perf_counter() - started) * 1000,
+    )
+    return {"prediction": prediction, "probability": proba, "model_version": version}
