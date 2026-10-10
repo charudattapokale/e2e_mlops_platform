@@ -11,3 +11,5 @@ dataset/data/
 *.pem
 *.key
 .env*
+
+*.bak

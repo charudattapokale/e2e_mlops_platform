@@ -1,3 +1,16 @@
+locals {
+  # Job definitions live in the repo: jenkins/jobs/*.groovy (path is relative to this folder)
+  job_dir   = "${path.module}/../../jenkins/jobs"
+  job_files = fileset(local.job_dir, "*.groovy")
+
+  # One JCasC config script per file: YAML wrapper around the raw Job DSL (Groovy).
+  # file() is not re-interpreted by Terraform, so ${...} inside the Groovy needs no escaping.
+  job_scripts = {
+    for f in local.job_files :
+    trimsuffix(f, ".groovy") => "jobs:\n  - script: |\n      ${indent(6, file("${local.job_dir}/${f}"))}\n"
+  }
+}
+
 # Jenkins controller in the ci namespace (official chart).
 # Builds run in temporary agent pods, so the controller stays small.
 resource "helm_release" "jenkins" {
@@ -34,31 +47,9 @@ resource "helm_release" "jenkins" {
         "pipeline-graph-view:latest",
       ]
 
-      # Agent pods run in the ci namespace with the jenkins-agent service account
-      # (rbac.tf), so they may create Jobs in the training namespace.
       JCasC = {
         defaultConfig = true
-        configScripts = {
-          training-job = <<-EOT
-            jobs:
-              - script: >
-                  pipelineJob('training_jenkins_pipeline') {
-                    description('Train the bank marketing model and log it to MLflow')
-                    definition {
-                      cpsScm {
-                        scm {
-                          git {
-                            remote { url('https://github.com/charudattapokale/e2e_mlops_platform.git') }
-                            branch('*/main')
-                          }
-                        }
-                        scriptPath('jenkins/training.Jenkinsfile')
-                        lightweight(true)
-                      }
-                    }
-                  }
-          EOT
-        }
+        configScripts = local.job_scripts
       }
     }
 
