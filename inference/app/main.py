@@ -1,4 +1,5 @@
 import logging
+import os
 import time
 from contextlib import asynccontextmanager
 
@@ -13,6 +14,8 @@ from app.webhook import router as webhook_router
 setup_logging()
 log = logging.getLogger("inference.app")
 predict_log = logging.getLogger("inference.predict")
+
+APP_VERSION = "0.2.0"
 
 # Readable request field -> column name the model was trained with
 COLUMNS = {
@@ -44,6 +47,7 @@ class Client(BaseModel):
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    log.info("event=app_started version=%s image=%s", APP_VERSION, os.getenv("IMAGE_REF", "unknown"))
     try:
         load_champion_or_fail()
     except ChampionNotFound as exc:

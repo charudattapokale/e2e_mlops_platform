@@ -24,6 +24,7 @@ spec:
             - {name: MLFLOW_TRACKING_URI, value: "http://mlflow.mlops.svc.cluster.local"}
             - {name: MODEL_NAME, value: "bank-marketing"}
             - {name: MODEL_ALIAS, value: "champion"}
+            - {name: IMAGE_REF, value: "${IMAGE}"}
             - {name: MLFLOW_HTTP_REQUEST_MAX_RETRIES, value: "2"}
             - {name: MLFLOW_HTTP_REQUEST_BACKOFF_FACTOR, value: "1"}
             - {name: MLFLOW_HTTP_REQUEST_TIMEOUT, value: "10"}
