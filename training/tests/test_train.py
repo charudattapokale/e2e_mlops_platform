@@ -75,7 +75,7 @@ class TestMain(unittest.TestCase):
 
         fake_mlflow.sklearn.log_model.assert_called_once()
         kwargs = fake_mlflow.sklearn.log_model.call_args.kwargs
-        self.assertEqual(kwargs["registered_model_name"], train.MODEL_NAME)
+        self.assertNotIn("registered_model_name", kwargs)
 
 
 if __name__ == "__main__":

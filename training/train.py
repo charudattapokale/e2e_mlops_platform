@@ -50,10 +50,9 @@ def main():
             }
         )
 
-        mlflow.sklearn.log_model(
+        model_info = mlflow.sklearn.log_model(
             model,
             name="model",
-            registered_model_name=MODEL_NAME,
             skops_trusted_types=[
                 "sklearn.ensemble._hist_gradient_boosting.predictor.TreePredictor",
                 "functools.partial",
