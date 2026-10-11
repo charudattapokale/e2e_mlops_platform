@@ -30,7 +30,11 @@ pipeline {
         container('kubectl') {
           script {
             env.TAG = sh(returnStdout: true, script: '''
-              git ls-files inference | grep -v -E '^inference/(k8s|scripts)/' | xargs sha256sum | sha256sum | cut -c1-12
+              git config --global --add safe.directory "$WORKSPACE"
+              FILES=$(git ls-files inference | grep -v -E '^inference/(k8s|scripts)/')
+              [ -n "$FILES" ] || { echo "no files found under inference/ (git missing or not a checkout?)" >&2; exit 1; }
+              echo "hashing $(echo "$FILES" | wc -l) files" >&2
+              echo "$FILES" | xargs sha256sum | sha256sum | cut -c1-12
             ''').trim()
             def exists = sh(returnStatus: true, script: '''
               REG_IP=$(getent hosts mlops-registry.localhost | cut -d' ' -f1)
