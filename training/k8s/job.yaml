@@ -23,6 +23,8 @@ spec:
           env:
             - {name: MLFLOW_TRACKING_URI, value: "http://mlflow.mlops.svc.cluster.local"}
             - {name: MLFLOW_EXPERIMENT,   value: "${MLFLOW_EXPERIMENT}"}
+            - {name: PROMOTE,             value: "${PROMOTE}"}
+            - {name: PROMOTION_MIN_DELTA, value: "${PROMOTION_MIN_DELTA}"}
             - {name: LEARNING_RATE,       value: "${LEARNING_RATE}"}
             - {name: MAX_ITER,            value: "${MAX_ITER}"}
             - {name: MAX_DEPTH,           value: "${MAX_DEPTH}"}

@@ -75,6 +75,8 @@ pipeline {
             export MAX_ITER=${params.MAX_ITER}
             export MAX_DEPTH=${params.MAX_DEPTH}
             export MLFLOW_EXPERIMENT=${params.MLFLOW_EXPERIMENT}
+            export PROMOTE=${params.PROMOTE}
+            export PROMOTION_MIN_DELTA=${params.PROMOTION_MIN_DELTA}
             envsubst < training/k8s/job.yaml | kubectl apply -f -
           """
         }
