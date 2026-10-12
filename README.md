@@ -12,21 +12,41 @@ The model is deliberately simple (gradient boosting on the public Bank Marketing
 
 ## How it flows
 
-```
- git push
-    |
-    v
- Jenkins (ci) --> Kaniko builds image --> local registry
-    |
-    +--> training Job (training) --> logs run and model --> MLflow + Postgres (mlops)
-    |                                                          |
-    |                                       alias "champion" moves, MLflow webhook fires
-    |                                                          |
-    +--> deploys inference API (serving) <---------------------+
-                  ^
-                  |
-        Traefik Ingress <-- client
-```
+```mermaid
+flowchart TB
+  dev([Developer]) -->|git push| gh[GitHub]
+  client([Client]) --> traefik[Traefik ingress]
+
+  subgraph ci [ci namespace]
+    jenkins[Jenkins controller]
+    agent["Agent pod: Kaniko and kubectl"]
+    jenkins --> agent
+  end
+
+  registry[("Local registry")]
+
+  subgraph training [training namespace]
+    job[Training Job]
+  end
+
+  subgraph mlops [mlops namespace]
+    mlflow[MLflow]
+    pg[("PostgreSQL")]
+    mlflow --- pg
+  end
+
+  subgraph serving [serving namespace]
+    api[Inference API]
+  end
+
+  gh -->|Jenkinsfile and code| jenkins
+  agent -->|push image| registry
+  agent -->|apply Job| job
+  agent -->|deploy and smoke test| api
+  job -->|log run and model| mlflow
+  mlflow -.->|webhook on alias change| api
+  traefik --> api
+`````
 
 ## Engineering decisions
 
