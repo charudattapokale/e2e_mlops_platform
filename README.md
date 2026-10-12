@@ -12,6 +12,8 @@ The model is deliberately simple (gradient boosting on the public Bank Marketing
 
 ## How it flows
 
+![MLOps platform architecture](docs/images/architecture.svg)
+
 ```mermaid
 flowchart TB
   dev([Developer]) -->|git push| gh[GitHub]
