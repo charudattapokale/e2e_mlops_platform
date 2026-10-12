@@ -114,4 +114,4 @@ These are deliberate scope decisions for a local project. Each one has a product
 
 ## Author
 
-Charudatta Pokale · [LinkedIn](www.linkedin.com/in/charudatta-pokale) · [GitHub](https://github.com/charudattapokale)
+Charudatta Pokale · [LinkedIn](http://www.linkedin.com/in/charudatta-pokale) · [GitHub](https://github.com/charudattapokale)
