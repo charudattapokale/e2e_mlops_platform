@@ -293,24 +293,38 @@ k3d version
 
 ## 14. Create the local cluster (Ubuntu)
 
-One control-plane node ("server") is enough on a 16 GB laptop.
+Create the whole platform with one command. Do not create the cluster by hand with `k3d cluster create mlops`:
+that cluster would have no local registry and no ingress port.
+
+Prerequisites (the steps above): Docker running, kubectl, helm, terraform, k3d, uv, git, and the repository cloned.
 
 ```bash
-k3d cluster create mlops
+sudo systemctl start docker          # needed after every WSL restart
+cd ~/projects/mlops-platform
+./scripts/up.sh                      # 5 to 8 minutes
+```
+
+`up.sh` does, in order:
+
+1. `infra/cluster`: creates the k3d cluster `mlops` and the local registry from `k3d-config.yaml`
+   (host port 8081 is mapped to the ingress; the registry is `localhost:5001` from the laptop and
+   `mlops-registry.localhost:5000` inside the cluster).
+2. Refreshes the kubeconfig and waits for the API server and the node.
+3. `infra/platform`: namespaces, Postgres, MLflow, Jenkins and the RBAC for the Jenkins agent.
+
+Check it:
+
+```bash
 kubectl get nodes
-docker ps
+kubectl get pods -A | grep -v -E 'Running|Completed'          # prints only the header when everything is up
+docker ps --format '{{.Names}}\t{{.Ports}}' | grep serverlb    # shows 0.0.0.0:8081->80/tcp
+kubectl get secret -n ci jenkins -o jsonpath='{.data.jenkins-admin-password}' | base64 -d; echo
 ```
 
-Expected: one node in `Ready` state, and a `k3d-mlops-server-0` container in `docker ps`. Check `k3d cluster create --help` for current options.
+Remove everything (this deletes all data): `./scripts/down.sh`.
 
-Delete and recreate it any time:
+If the API server does not come up, run `wsl --shutdown` in PowerShell, reopen Ubuntu and run `up.sh` again.
 
-```bash
-k3d cluster delete mlops
-k3d cluster create mlops
-```
-
----
 
 ## Daily-use commands
 
