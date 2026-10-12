@@ -1,31 +1,57 @@
 # MLflow
 
-## MLflow 3 storage
-- `log_model` creates a LoggedModel entity. Files go to `/mlartifacts/<experiment>/models/<model-id>/artifacts/`.
-- Model artifacts are no longer stored under the run. The run page shows a link to the logged model.
-  The banner "viewing artifacts assigned to a logged model" is MLflow's own message, not a copy.
-- `log_artifact(s)` is what creates a run's own `artifacts/` folder. Without it, no run folders exist on disk.
-- Load by registry name or `models:/<model-id>`, never by path. `runs:/<run-id>/model` is the MLflow 2 style.
+## Storage in MLflow 3
+- `log_model` creates a LoggedModel. Its files go to `/mlartifacts/<experiment>/models/<model-id>/artifacts/`, not under the run.
+- The run page's Artifacts tab shows them with the banner "viewing artifacts assigned to a logged model": a view, not a copy.
+  Checked on disk: only `models/` exists and no run folders, until `log_artifact` is called.
+- Deleting a run in the UI is a soft delete: rows and files stay. `mlflow gc` removes them for good. Its flags for proxied
+  artifacts were not verified.
+- Load by registry name or `models:/<name>/<version>`, never by path.
+- The client (3.17) was newer than the server (3.14) and worked. A newer client can call endpoints an older server lacks.
+- `HistGradientBoostingClassifier` needed `skops_trusted_types=[...]` in `log_model` (MLflow 3 saves sklearn models with skops).
+  Loading worked without a list.
 
-## Registry
-- `registered_model_name=` registers a version. The alias `champion` points at one version.
-- Serving loads `models:/bank-marketing@champion`.
-- Registering every run fills the registry. A promotion gate (register or move the alias only if better) keeps it clean.
+## Registry and alias
+- `registered_model_name=` creates a version. The alias `champion` points at one version. Serving reads the alias, then loads
+  `models:/<name>/<version>`, so the alias cannot move between the two calls.
+- A missing alias is reported as `INVALID_PARAMETER_VALUE` ("Registered model alias X not found"), a code that is also used for bad
+  input. The error code cannot identify "no champion". Ask `get_registered_model(name).aliases` instead.
+  Found by running the app with `MODEL_ALIAS=nonexistent`: the first version matched the wrong code and logged a traceback.
+- Training logs models without registering them. A promotion gate is planned.
 
-## Versions
-Client 3.17.0 against server 3.14.0 works here. A newer client can call endpoints an older server lacks.
-No exact match is required. If errors appear around `log_model` or the registry, check versions first.
+## Webhooks (MLflow 3.14 server)
+Event `model_version_alias.created`. Experimental. SQL backend only. Defaults read from the installed package:
 
-## skops
-MLflow 3 saves sklearn models with skops and refuses types not on its trusted list.
-`HistGradientBoostingClassifier` needs `skops_trusted_types=[...]`. List only types from the error message.
-Loading may need the same list. **(unverified)**
+| Variable | Default | Note |
+| --- | --- | --- |
+| `MLFLOW_WEBHOOK_ALLOWED_SCHEMES` | `https` | comma-separated list |
+| `MLFLOW_WEBHOOK_ALLOW_PRIVATE_IPS` | false | `true` allows 10.x Service addresses |
+| `MLFLOW_WEBHOOK_REQUEST_MAX_RETRIES` | 3 | a longer outage loses the event |
+| `MLFLOW_WEBHOOK_REQUEST_TIMEOUT` | 30 s | |
+| `MLFLOW_WEBHOOK_CACHE_TTL` | 60 s | a new webhook may not fire for up to a minute |
+| `MLFLOW_WEBHOOK_DELIVERY_MAX_WORKERS` | 10 | |
 
-## Reloading a new champion in serving
-| Method | Notes |
-| --- | --- |
-| Call `/reload` from the promotion step | Simple, but reaches one pod |
-| MLflow webhook | Event names and 3.14 support **(unverified)**. A lost event is never retried |
-| Polling the alias | Robust: compares the loaded version with the registry, so errors are temporary |
-| `kubectl rollout restart` | Zero downtime, no code change |
-Use polling as the base. A webhook can be added for speed.
+An in-cluster receiver (plain http, private Service address) needs the first two relaxed. They are set through the chart's
+`extraEnvVars` in `infra/platform/mlflow.tf`. `kubectl set env` works for an experiment and is reverted by the next apply.
+
+Observed delivery:
+- Payload: `{"entity": "model_version_alias", "action": "created", "timestamp": ..., "data": {"name", "alias", "version"}}`.
+- Headers: `x-mlflow-delivery-id`, `x-mlflow-timestamp`. No signature header, because the webhook had no secret.
+- The model in the pod swapped about 160 ms after the alias moved.
+
+Design:
+- Registration is a row in Postgres. It survives MLflow restarts and is lost with `down.sh`. The registration script is idempotent and runs as a pipeline stage.
+- The handler treats the payload as a hint and re-reads the registry, so a forged or duplicated request cannot inject a model.
+- With a secret, MLflow signs requests with HMAC-SHA256 (docs). The signature header name is unknown until a webhook with a secret exists. Not built yet.
+
+Security:
+- With the guard loosened and no authentication, anyone who can reach the MLflow API can create a webhook that makes the server call internal
+  addresses. Acceptable behind a port-forward on a laptop, not beyond.
+- A published advisory describes a redirect bypass of the URL check. Its references point at 3.15.0 as the fix (read from search
+  excerpts only, unverified). Consider a newer server image.
+
+## Client behaviour
+- The default HTTP timeout is 120 s and retries back off, so a dead MLflow can stall a caller for minutes. Bound it with
+  `MLFLOW_HTTP_REQUEST_MAX_RETRIES`, `MLFLOW_HTTP_REQUEST_BACKOFF_FACTOR` and `MLFLOW_HTTP_REQUEST_TIMEOUT`.
+- A `kubectl port-forward` stays bound to the pod it was opened against. After MLflow is replaced, an old tunnel can keep the local
+  port without working. Close it before opening a new one.

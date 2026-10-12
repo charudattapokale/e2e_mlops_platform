@@ -1,14 +1,13 @@
 # Learning notes
 
-Short notes on what was learned while building this platform, with the reasoning and the pitfalls.
+What was learned while building this platform, with the reasoning and the pitfalls. A line marked **unverified** came from memory or from
+search excerpts and was not tested here.
 
 | File | Topic |
 | --- | --- |
+| [kubernetes.md](kubernetes.md) | Hierarchy, nodes, Jobs, readiness, RBAC, checking a cluster |
 | [jenkins.md](jenkins.md) | JCasC, Job DSL, Jenkinsfile, parameters, adding a pipeline |
-| [image-tag.md](image-tag.md) | Content-hash image tags, skipping unchanged builds, registry addresses |
-| [mlflow.md](mlflow.md) | MLflow 3 storage, registry, champion alias, reloading in serving |
-| [kubernetes.md](kubernetes.md) | Job vs CronJob vs Deployment, readiness, RBAC, checking the cluster |
-| [terraform.md](terraform.md) | Two stages, locals, state lock, common errors |
-| [python-fastapi.md](python-fastapi.md) | uv, lockfile, FastAPI lifespan |
-
-Convention: a line marked **(unverified)** came from memory and was not tested here.
+| [image-tag.md](image-tag.md) | Content-hash tags, the empty-hash bug, registry addresses |
+| [mlflow.md](mlflow.md) | MLflow 3 storage, registry, aliases, webhooks and their guard |
+| [terraform.md](terraform.md) | Two stages, locals, state, errors and what they meant |
+| [python-fastapi.md](python-fastapi.md) | uv, tests, FastAPI lifespan, logging, shell gotchas |
